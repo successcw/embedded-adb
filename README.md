@@ -20,6 +20,7 @@ I have commented unuseful code for compile error, the bellowing works well:
 * adb shell
 * adb push
 * adb pull  
+
 you may need change rule.mk and adbd/Makefile when porting to your embedded system.  
 
 ## add usb enable to init process(rcS)
@@ -64,7 +65,7 @@ you may need change rule.mk and adbd/Makefile when porting to your embedded syst
   * [Linux](https://dl.google.com/android/repository/platform-tools_r23-linux.zip)
 
 ## windows shell error code
-use windows CMD and adb shell, there is error code when ls or TAB/Ctrl+C/BACKSPACE 
+Use windows CMD and adb shell, there is error code when ls or TAB/Ctrl+C/BACKSPACE  
 you can use [adbputty](https://github.com/sztupy/adbputty/downloads) instead of CMD to fix this problem.
 
 
