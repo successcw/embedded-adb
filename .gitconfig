@@ -1,0 +1,11 @@
+[user]
+    email = successcw@gmail.com
+    name = weicheng
+[core]
+    editor = vim
+[merge]
+    tool = vimdiff
+[commit]
+    template = ~/.gittemplate
+[color]
+	ui = auto
