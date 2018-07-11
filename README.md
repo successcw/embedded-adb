@@ -19,7 +19,7 @@ so I porting adbd from [Android 5.0.1](https://android.googlesource.com/platform
 I have commented unuseful code for compile error, the bellowing works well:  
 * adb shell
 * adb push
-* adb pull
+* adb pull  
 you may need change rule.mk and adbd/Makefile when porting to your embedded system.  
 
 ## add usb enable to init process(rcS)
@@ -53,10 +53,10 @@ you may need change rule.mk and adbd/Makefile when porting to your embedded syst
   ```
 
 ## Driver
-  *adb
+  * adb
    use common adb driver, refer to Drivers\universaladbdriver_v5.0.exe 
-  *acm
-   windows support acm by default, if not, please refer to Drivers\win7.inf or winxp.inf
+  * acm
+   windows support acm by default, if not, please refer to Drivers\win7.inf or winxp.inf  
 
 ## PC adb
   * [windows](https://dl.google.com/android/repository/platform-tools_r23-windows.zip)
@@ -64,7 +64,7 @@ you may need change rule.mk and adbd/Makefile when porting to your embedded syst
   * [Linux](https://dl.google.com/android/repository/platform-tools_r23-linux.zip)
 
 ## windows shell error code
-use windows CMD and adb shell, there is error code when ls or TAB/Ctrl+C/BACKSPACE
+use windows CMD and adb shell, there is error code when ls or TAB/Ctrl+C/BACKSPACE 
 you can use [adbputty](https://github.com/sztupy/adbputty/downloads) instead of CMD to fix this problem.
 
 
