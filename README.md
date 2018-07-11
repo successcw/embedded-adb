@@ -1,62 +1,70 @@
----
-layout: post
-title: Porting adbd to embedded Linux arm A7
-date: 2018-07-10 00:00:00 +0300
-description: # Add post description (optional) 
-img: # Add image post (optional)
-tags: [FreeRtos] # add tag
----
 ## Change kernel config
+* enable CONFIG_USB_F_ as you need
+  ```
+  CONFIG_USB_F_ACM=y
+  CONFIG_USB_F_FS=y
+  CONFIG_USB_U_SERIAL=y
+  ```
+* enable CONFIGFS as you need
+  ```
+  CONFIG_USB_CONFIGFS_ACM=y
+  CONFIG_USB_CONFIGFS_F_FS=y
+  CONFIG_USB_CONFIGFS_SERIAL=y
+  ```
+Please noted, don't enable legacy usb config if you use configfs.  
+
 ## Porting adbd
 adbd changed huge with Android new version, but I don't need so much feature, like: verification.  
 so I porting adbd from [Android 5.0.1](https://android.googlesource.com/platform/system/core/+/android-5.0.1_r1/adb/)  
-Linux Oops可以打出callstack，类似如下
-```
-[   58.287873] Kernel panic - not syncing: Fatal exception
-[   58.293116] CPU0: stopping
-[   58.295835] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G      D W       4.9.38 #2
-[   58.302981] Hardware name: Artosyn Sirius Family
-[   58.307604] Backtrace: 
-[   58.310075] [<8010aa5c>] (dump_backtrace) from [<8010acf8>] (show_stack+0x18/0x1c)
-[   58.317660]  r7:80c01f20 r6:600f0193 r5:00000000 r4:80c1354c
-[   58.323337] [<8010ace0>] (show_stack) from [<80316998>] (dump_stack+0x84/0xa0)
-[   58.330577] [<80316914>] (dump_stack) from [<8010c7b8>] (handle_IPI+0xd4/0x190)
-[   58.337900]  r7:80c01f20 r6:00000000 r5:00000000 r4:80c289e0
-[   58.343575] [<8010c6e4>] (handle_IPI) from [<80101464>] (gic_handle_irq+0x80/0x9c)
-[   58.351161]  r7:80c136f8 r6:80c01f20 r5:80c03b28 r4:a0802000
-[   58.356834] [<801013e4>] (gic_handle_irq) from [<8010b7b8>] (__irq_svc+0x58/0x74)
-```
-之所以能打出callstack主要是依靠CONFIG_KALLSYMS_ALL， 该宏会将编译生成的符号表加入到elf文件中
-Oops时，通过SP和FP找到对应的stack frame，然后查符号表回溯出整个backtrace.
-![SP_FP]({{site.baseurl}}/assets/img/sp-fp.png)
+I have commented unuseful code for compile error, the bellowing works well:  
+* adb shell
+* adb push
+* adb pull
+you may need change rule.mk and adbd/Makefile when porting to your embedded system.  
 
-## Porting to FreeRTOS
-
-* 移植kernel/kallsyms.c
-* 移植scripts/kallsyms.c，并生成执行文件kallsyms
-* 在Makefile中添加kallsyms到target.bin
+## add usb enable to init process(rcS)
   ```
-  $(TARGET).bin: $(OBJ_S) $(OBJ_C) 
-    @$(LD) $^ $(LDFLAGS)  -T$(LINK_SCRIPT) -o $(TARGET)_temp1.elf
-    $(NM) -n $(TARGET)_temp1.elf | ./kallsyms --all-symbols --base-relative > kallsyms_temp1.S
-    $(CC) $(CFLAGS) -c -o kallsyms_temp1.o kallsyms_temp1.S
-    @$(LD) $^ kallsyms_temp1.o $(LDFLAGS)  -T$(LINK_SCRIPT) -o $(TARGET)_temp2.elf
-    $(NM) -n $(TARGET)_temp2.elf | ./kallsyms --all-symbols --base-relative > kallsyms_temp2.S
-    $(CC) $(CFLAGS) -c -o kallsyms_temp2.o kallsyms_temp2.S
-    @$(LD) $^ kallsyms_temp2.o $(LDFLAGS)  -T$(LINK_SCRIPT) -o $(TARGET).elf
-    $(OBJCOPY) -O binary $(TARGET).elf $@
-    $(OBJDUMP) -D $(TARGET).elf > $(TARGET).dis
-    $(NM) $(TARGET).elf > $(TARGET).map
+  mount -t configfs none /sys/kernel/config
+  mkdir -p /sys/kernel/config/usb_gadget/g1
+  sync
+  echo "0xBBE" > /sys/kernel/config/usb_gadget/g1/idVendor
+  echo "0xB002" > /sys/kernel/config/usb_gadget/g1/idProduct
+  mkdir -p /sys/kernel/config/usb_gadget/g1/strings/0x409
+  sync
+  echo "ST12345678" > /sys/kernel/config/usb_gadget/g1/strings/0x409/serialnumber
+  echo "COM" > /sys/kernel/config/usb_gadget/g1/strings/0x409/manufacturer
+  echo "P1" > /sys/kernel/config/usb_gadget/g1/strings/0x409/product
+  mkdir -p /sys/kernel/config/usb_gadget/g1/functions/acm.GS0
+  mkdir -p /sys/kernel/config/usb_gadget/g1/functions/acm.GS1
+  mkdir -p /sys/kernel/config/usb_gadget/g1/functions/ffs.adb
+  mkdir -p /sys/kernel/config/usb_gadget/g1/configs/c.1/strings/0x409
+  echo "2acm1adb" > /sys/kernel/config/usb_gadget/g1/configs/c.1/strings/0x409/configuration
+  ln -s /sys/kernel/config/usb_gadget/g1/functions/acm.GS0 /sys/kernel/config/usb_gadget/g1/configs/c.1
+  ln -s /sys/kernel/config/usb_gadget/g1/functions/acm.GS1 /sys/kernel/config/usb_gadget/g1/configs/c.1
+  ln -s /sys/kernel/config/usb_gadget/g1/functions/ffs.adb /sys/kernel/config/usb_gadget/g1/configs/c.1
+  mkdir -p /dev/usb-ffs/adb
+  mkdir /dev/pts
+  sync
+  mount -t functionfs adb /dev/usb-ffs/adb
+  adbd &
+  mount devpts /dev/pts -t devpts
+  sleep 1
+  echo "60500000.dwc3" > /sys/kernel/config/usb_gadget/g1/UDC
   ```
-具体含义是：
-1. 生成elf
-2. 生成elf对应的kallsyms
-3. 将kallsyms编译为.o并加入到elf中
-4. 生成第3步elf对应的kallsyms，这个kallsyms包含所有的符号表（也包含kallsyms这个模块本身的符号信息）
-5. 将kallsyms编译为.o并加入到elf中
-6. 通过elf生成.bin文件
 
-<!---
-![I and My friends]({{site.baseurl}}/assets/img/we-in-rest.jpg)
--->
+## Driver
+  *adb
+   use common adb driver, refer to Drivers\universaladbdriver_v5.0.exe 
+  *acm
+   windows support acm by default, if not, please refer to Drivers\win7.inf or winxp.inf
+
+## PC adb
+  * [windows](https://dl.google.com/android/repository/platform-tools_r23-windows.zip)
+  * [mac](https://dl.google.com/android/repository/platform-tools_r23-macosx.zip)
+  * [Linux](https://dl.google.com/android/repository/platform-tools_r23-linux.zip)
+
+## windows shell error code
+use windows CMD and adb shell, there is error code when ls or TAB/Ctrl+C/BACKSPACE
+you can use [adbputty](https://github.com/sztupy/adbputty/downloads) instead of CMD to fix this problem.
+
 
